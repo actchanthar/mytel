@@ -7,11 +7,12 @@ Green='\033[0;32m'
 Yellow='\033[0;33m'
 
 # Constants
-GITHUB_REPO_URL="https://github.com/actchanthar/mytel.git"  # e.g., https://github.com/yourusername/vless-vps.git
+GITHUB_REPO_URL="https://github.com/actchanthar/mytel.git"  # Your repo
 NODE_PORT=3000  # Internal port for Node.js (Nginx proxies to this)
 SERVER_PORT=443  # External port (TLS)
 DOMAIN="actanimemm.eu.org"  # Your domain
-UUID="a10d76fd-25ec-4d5a-bdf1-6593a73e2e16"  # Default UUID (edit in server.js later)
+UUID="a10d76fd-25ec-4d5a-bdf1-6593a73e2e16"  # Default UUID
+EMAIL="layp75486@gmail.com"  # Replace with your actual email for Certbot
 
 OK="${Green}[OK]"
 ERROR="${Red}[ERROR]"
@@ -34,7 +35,7 @@ if ! grep -qs "ubuntu" /etc/os-release; then
     exit 1
 fi
 
-# Disable firewalls
+# Disable firewalls temporarily
 print_info "Disabling firewalls..."
 systemctl stop ufw firewalld nftables >/dev/null 2>&1
 systemctl disable ufw firewalld nftables >/dev/null 2>&1
@@ -54,7 +55,10 @@ print_ok "Node.js installed"
 
 # Clone GitHub repo
 print_info "Cloning GitHub repo..."
-git clone $GITHUB_REPO_URL /root/vless-vps
+if ! git clone $GITHUB_REPO_URL /root/vless-vps; then
+    print_error "Git clone failed! Check repo URL."
+    exit 1
+fi
 cd /root/vless-vps
 print_ok "Repo cloned"
 
@@ -82,9 +86,9 @@ EOF
 systemctl restart nginx
 print_ok "Nginx configured (HTTP)"
 
-# Get TLS cert
+# Get TLS cert (non-interactive)
 print_info "Getting TLS certificate..."
-certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email your-email@example.com --preferred-challenges http
+certbot --nginx -d $DOMAIN --non-interactive --agree-tos --no-eff-email --email $EMAIL --preferred-challenges http
 print_ok "TLS enabled (now on port 443)"
 
 # Set up as service (using systemd)
@@ -108,7 +112,7 @@ systemctl enable vless
 systemctl start vless
 print_ok "Service started"
 
-# Open firewall ports
+# Open firewall ports and re-enable ufw
 print_info "Opening ports..."
 ufw allow 80/tcp
 ufw allow 443/tcp
