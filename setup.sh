@@ -7,18 +7,17 @@ Green='\033[0;32m'
 Yellow='\033[0;33m'
 
 # Constants
-GITHUB_REPO_URL="https://github.com/actchanthar/mytel.git"  # Your repo
-NODE_PORT=3000  # Internal port for Node.js (Nginx proxies to this)
-SERVER_PORT=443  # External port (TLS)
-DOMAIN="actanimemm.eu.org"  # Your domain
-UUID="a10d76fd-25ec-4d5a-bdf1-6593a73e2e16"  # Default UUID
-EMAIL="layp75486@gmail.com"  # Replace with your actual email for Certbot
+GITHUB_REPO_URL="https://github.com/actchanthar/mytel.git"
+NODE_PORT=3000
+SERVER_PORT=443
+DOMAIN="actanimemm.eu.org"
+UUID="a10d76fd-25ec-4d5a-bdf1-6593a73e2e16"
+EMAIL="layp75486@gmail.com"
 
 OK="${Green}[OK]"
 ERROR="${Red}[ERROR]"
 INFO="${Yellow}[INFO]"
 
-# Print functions
 print_ok() { echo -e "${OK} $1 ${Color_Off}"; }
 print_error() { echo -e "${ERROR} $1 ${Color_Off}"; }
 print_info() { echo -e "${INFO} $1 ${Color_Off}"; }
@@ -53,13 +52,13 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt install -y nodejs
 print_ok "Node.js installed"
 
-# Clone GitHub repo
+# Clone GitHub repo to /root/mytel
 print_info "Cloning GitHub repo..."
-if ! git clone $GITHUB_REPO_URL /root/vless-vps; then
+if ! git clone $GITHUB_REPO_URL /root/mytel; then
     print_error "Git clone failed! Check repo URL."
     exit 1
 fi
-cd /root/vless-vps
+cd /root/mytel
 print_ok "Repo cloned"
 
 # Install npm packages
@@ -91,7 +90,7 @@ print_info "Getting TLS certificate..."
 certbot --nginx -d $DOMAIN --non-interactive --agree-tos --no-eff-email --email $EMAIL --preferred-challenges http
 print_ok "TLS enabled (now on port 443)"
 
-# Set up as service (using systemd)
+# Set up as service (using systemd) - CORRECTED PATH
 print_info "Setting up as systemd service..."
 cat << EOF > /etc/systemd/system/vless.service
 [Unit]
@@ -99,10 +98,10 @@ Description=VLESS Proxy Server
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/node /root/vless-vps/server.js
+ExecStart=/usr/bin/node /root/mytel/server.js
 Restart=always
 User=root
-WorkingDirectory=/root/vless-vps
+WorkingDirectory=/root/mytel
 
 [Install]
 WantedBy=multi-user.target
