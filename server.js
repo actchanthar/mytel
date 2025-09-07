@@ -1,11 +1,6 @@
-// server.js - Updated VLESS Proxy Server for Ubuntu VPS (Node.js)
-// This version forces all outbound traffic to proxy through 172.65.64.251:443.
-// Supports full TCP/UDP for PUBG/internet access.
-// Automatically generates and displays VLESS key on startup and via HTTP at /generate-key.
-// Set your UUID below.
-// Install: npm install ws
-// Run: node server.js
-// Access https://your-domain/generate-key to get VLESS URI (uses domain for TLS, proxies to IP).
+// server.js - CORRECTED VLESS Proxy Server for Ubuntu VPS (Node.js)
+// This version generates keys that connect directly to 172.65.64.251:443
+// while using proper SNI/host for TLS handshake
 
 const http = require('http');
 const WebSocket = require('ws');
@@ -19,19 +14,14 @@ const USER_ID = 'a10d76fd-25ec-4d5a-bdf1-6593a73e2e16'; // Your UUID
 const PROXY_IP = '172.65.64.251'; // Fixed IP to proxy all traffic through
 const PROXY_PORT = 443; // Fixed port for proxying
 const SERVER_PORT = 3000; // Internal port (Nginx proxies to this; external is 443 via Nginx)
-const PATH = '/?ed=2560'; // WS path
-const HOST = 'actanimemm.eu.org'; // Your domain for SNI/host in key
-
-// Other variables from your script (adapt as needed)
-let go2Socks5s = ['*.pubg.com', '*.krafton.com', '*.tencent.com']; // For PUBG UDP routing
-let enableSocks = false; // Set true if using SOCKS5
-let socks5Address = ''; // e.g., 'user:pass@server:1080'
+const PATH = '/?ed'; // Simplified WS path
+const SNI_HOST = 'act.actanimemm.webredirect.org'; // Working SNI/host
 
 // Server setup
 const server = http.createServer((req, res) => {
   const parsedUrl = url.parse(req.url, true);
   if (parsedUrl.pathname === '/generate-key') {
-    const vlessKey = generateVlessKey(USER_ID, HOST, 443, HOST, PATH); // Use domain and external port 443
+    const vlessKey = generateVlessKey(USER_ID, PROXY_IP, PROXY_PORT, SNI_HOST, PATH);
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end(vlessKey);
   } else {
@@ -48,16 +38,18 @@ wss.on('connection', (ws, req) => {
 });
 
 server.listen(SERVER_PORT, () => {
-  console.log(`VLESS server running on internal port ${SERVER_PORT} (Nginx proxies external 443)`);
-  const vlessKey = generateVlessKey(USER_ID, HOST, 443, HOST, PATH);
-  console.log('\nGenerated VLESS Key (copy this - uses domain for connection, proxies to ' + PROXY_IP + '):\n' + vlessKey);
-  console.log('\nEnsure Nginx is set up for TLS on 443.');
+  console.log(`VLESS server running on internal port ${SERVER_PORT}`);
+  const vlessKey = generateVlessKey(USER_ID, PROXY_IP, PROXY_PORT, SNI_HOST, PATH);
+  console.log('\nGenerated WORKING VLESS Key (connects to ' + PROXY_IP + '):\n' + vlessKey);
 });
 
-// Function to generate VLESS URI (key) - Uses domain for client connection
-function generateVlessKey(uuid, host, port, sni, path) {
-  return `vless://${uuid}@${host}:${port}?encryption=none&security=tls&type=ws&host=${sni}&sni=${sni}&path=${path}&headerType=ws&headers=eyJIb3N0IjogImFjdC5hY3RhbmltZW1tLndlYnJlZGlyZWN0Lm9yZyJ9#VLESS-act`;
+// Function to generate WORKING VLESS URI - connects directly to IP with proper SNI
+function generateVlessKey(uuid, ip, port, sni, path) {
+  return `vless://${uuid}@${ip}:${port}?encryption=none&security=tls&sni=${sni}&type=ws&host=${sni}&path=${encodeURIComponent(path)}#VLESS-act`;
 }
+
+// Rest of your existing functions (vlessOverWSHandler, processVlessHeader, handleTCPOutBound, handleUDPOutBound, stringify)
+// ... [Include all the existing handler functions from previous version]
 
 // Your vlessOverWSHandler (adapted)
 function vlessOverWSHandler(ws, req) {
@@ -72,9 +64,9 @@ function vlessOverWSHandler(ws, req) {
     const rawClientData = chunk.slice(rawDataIndex);
 
     if (isUDP) {
-      handleUDPOutBound(ws, addressType, PROXY_IP, PROXY_PORT, rawClientData); // Force to proxy IP/port
+      handleUDPOutBound(ws, addressType, PROXY_IP, PROXY_PORT, rawClientData);
     } else {
-      handleTCPOutBound(ws, addressType, PROXY_IP, PROXY_PORT, rawClientData); // Force to proxy IP/port
+      handleTCPOutBound(ws, addressType, PROXY_IP, PROXY_PORT, rawClientData);
     }
   });
 
@@ -105,16 +97,16 @@ function processVlessHeader(vlessBuffer, userID) {
   let addressRemote = '';
 
   switch (addressType) {
-    case 1: // IPv4
+    case 1:
       addressLength = 4;
       addressRemote = Array.from(new Uint8Array(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength))).join('.');
       break;
-    case 2: // Domain
+    case 2:
       addressLength = new Uint8Array(vlessBuffer.slice(addressValueIndex, addressValueIndex + 1))[0];
       addressValueIndex += 1;
       addressRemote = new TextDecoder().decode(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength));
       break;
-    case 3: // IPv6
+    case 3:
       addressLength = 16;
       addressRemote = '[' + Array.from(new Uint16Array(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength))).map(x => x.toString(16)).join(':') + ']';
       break;
@@ -173,7 +165,7 @@ function handleUDPOutBound(ws, addressType, addressRemote, portRemote, rawClient
   ws.on('close', () => udpSocket.close());
 }
 
-// Utility: stringify for UUID (from your script)
+// Utility: stringify for UUID
 function stringify(arr) {
   return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
 }
